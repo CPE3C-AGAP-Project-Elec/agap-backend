@@ -1,5 +1,5 @@
 const express = require('express');
-const cors = require('cors');
+const cors = require('cors');  // ← Only once
 const helmet = require('helmet');
 const morgan = require('morgan');
 const compression = require('compression');
@@ -23,8 +23,10 @@ const app = express();
 connectDB();
 
 // Middleware
+app.use(cors({
+    origin: 'https://automatedgeospatialalertplatform.com'  // ← Only one cors
+}));
 app.use(helmet());
-app.use(cors());
 app.use(compression());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -60,9 +62,8 @@ app.get('/', (req, res) => {
 // Error handling middleware
 const errorMiddleware = require('./middleware/errorMiddleware');
 app.use(errorMiddleware);
-// Add this with other routes
 
-// Start server
+// Start server - ONLY ONE
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
