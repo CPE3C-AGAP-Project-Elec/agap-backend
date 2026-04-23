@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { getRiskPrediction, getRiskHistory } = require('../controllers/riskController');
 const {
   registerUser,
   verifyEmail,
@@ -27,5 +28,7 @@ router.post('/reset-password', resetPassword);
 router.get('/me', protect, getMe);
 router.put('/updatedetails', protect, updateDetails);
 router.put('/changepassword', protect, changePassword);
+router.get('/predict', getRiskPrediction);
+router.get('/history', getRiskHistory);
 
 module.exports = router;
