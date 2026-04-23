@@ -32,8 +32,8 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
-  verificationCode: {
-    type: String,
+    verificationCode: {
+    type: String,  // Make sure this is String, not Number
     select: false,
   },
   verificationCodeExpires: {
