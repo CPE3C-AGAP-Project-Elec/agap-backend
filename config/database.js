@@ -2,7 +2,6 @@ const mongoose = require('mongoose');
 
 const connectDB = async () => {
   try {
-    // Remove deprecated options for Mongoose 7+
     const conn = await mongoose.connect(process.env.MONGODB_URI);
     
     console.log(`✅ MongoDB Atlas Connected Successfully!`);
@@ -24,8 +23,7 @@ const connectDB = async () => {
 
   } catch (error) {
     console.error(`❌ MongoDB Atlas Connection Failed: ${error.message}`);
-    // Don't exit the process, just log the error
-    console.error('Please check your MONGODB_URI in .env file');
+    process.exit(1);
   }
 };
 
