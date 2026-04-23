@@ -10,6 +10,7 @@ dotenv.config();
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
+const weatherRoutes = require('./routes/weatherRoutes');
 
 // Import database connection
 const connectDB = require('./config/database');
@@ -30,6 +31,7 @@ app.use(morgan('dev'));
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/weather', weatherRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -47,6 +49,7 @@ app.get('/', (req, res) => {
     version: '1.0.0',
     endpoints: {
       auth: '/api/auth',
+      weather: '/api/weather',
       health: '/health'
     }
   });
