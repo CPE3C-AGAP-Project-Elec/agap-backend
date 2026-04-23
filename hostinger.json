@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "type": "nodejs",
+  "entryPoint": "server.js",
+  "command": "npm start",
+  "framework": "express",
+  "nodeVersion": "18"
+}
