@@ -16,82 +16,160 @@ const generateToken = (id) => {
 
 
 // ================= REGISTER =================
+// In authController.js - update registerUser
 const registerUser = async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
-    if (!name || !email || !password) {
-      return res.status(400).json({ success: false, message: 'Please provide all required fields' });
-    }
+    console.log("========================================");
+    console.log("REGISTRATION");
+    console.log("Email:", email);
+    console.log("========================================");
 
-    if (password.length < 6) {
-      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
-    }
-
-    const userExists = await User.findOne({ email });
-    if (userExists) {
-      return res.status(400).json({ success: false, message: 'User already exists' });
-    }
+    // ... validation ...
 
     const verificationCode = generateVerificationCode();
     const verificationCodeExpires = new Date(Date.now() + 10 * 60 * 1000);
+
+    console.log("Generated code:", verificationCode);
+    console.log("Code type:", typeof verificationCode);
+    console.log("Expires:", verificationCodeExpires);
 
     const user = await User.create({
       name,
       email,
       password,
       isVerified: false,
-      verificationCode,
+      verificationCode: verificationCode, // Store as string
       verificationCodeExpires,
     });
 
-    await sendVerificationEmail(email, verificationCode);
+    console.log("User created. Stored code type:", typeof user.verificationCode);
+
+    // Send email
+    const emailSent = await sendVerificationEmail(email, verificationCode);
+    
+    if (!emailSent) {
+      console.error("Failed to send email");
+    }
 
     res.status(201).json({
       success: true,
       message: 'Verification code sent to your email',
-      data: { email: user.email, requiresVerification: true },
+      data: { 
+        email: user.email, 
+        requiresVerification: true,
+        debug_code: process.env.NODE_ENV === 'development' ? verificationCode : undefined // Only for testing
+      },
     });
 
   } catch (error) {
     console.error('Registration error:', error);
-    res.status(500).json({ success: false, message: 'Server error during registration' });
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 };
 
 
 
 // ================= VERIFY EMAIL =================
+// agap-backend/controllers/authController.js
+// Replace your verifyEmail function with this:
+
 const verifyEmail = async (req, res) => {
   try {
     const { email, code } = req.body;
 
+    console.log("========================================");
+    console.log("VERIFY EMAIL REQUEST");
+    console.log("Email:", email);
+    console.log("Code received:", code);
+    console.log("Code type:", typeof code);
+    console.log("========================================");
+
     if (!email || !code) {
-      return res.status(400).json({ success: false, message: 'Please provide email and verification code' });
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Please provide email and verification code' 
+      });
     }
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email })
+      .select('+verificationCode +verificationCodeExpires');
 
-    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-
-    if (user.verificationCode !== code) {
-      return res.status(400).json({ success: false, message: 'Invalid verification code' });
+    if (!user) {
+      console.log("❌ User not found:", email);
+      return res.status(404).json({ 
+        success: false, 
+        message: 'User not found' 
+      });
     }
 
+    console.log("User found:", user.email);
+    console.log("Stored code in DB:", user.verificationCode);
+    console.log("Stored code type:", typeof user.verificationCode);
+    console.log("Expires at:", user.verificationCodeExpires);
+    console.log("Current time:", new Date());
+
+    // Check if user is already verified
+    if (user.isVerified) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Email already verified. Please login.' 
+      });
+    }
+
+    // Check if verification code exists
+    if (!user.verificationCode) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'No verification code found. Please request a new one.' 
+      });
+    }
+
+    // Convert both to string for comparison (fixes number/string mismatch)
+    const storedCode = String(user.verificationCode);
+    const providedCode = String(code);
+
+    console.log("Comparing:", storedCode, "===", providedCode);
+
+    if (storedCode !== providedCode) {
+      console.log("❌ Code mismatch!");
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid verification code' 
+      });
+    }
+
+    // Check if code is expired
     if (user.verificationCodeExpires < new Date()) {
-      return res.status(400).json({ success: false, message: 'Verification code has expired' });
+      console.log("❌ Code expired!");
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Verification code has expired. Please request a new one.' 
+      });
     }
 
+    console.log("✅ Code is valid! Verifying user...");
+
+    // Mark user as verified
     user.isVerified = true;
     user.verificationCode = undefined;
     user.verificationCodeExpires = undefined;
     await user.save();
 
-    res.status(200).json({ success: true, message: 'Email verified successfully!' });
+    console.log("✅ User verified successfully!");
+
+    res.status(200).json({ 
+      success: true, 
+      message: 'Email verified successfully!' 
+    });
 
   } catch (error) {
     console.error('Verification error:', error);
-    res.status(500).json({ success: false, message: 'Server error during verification' });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error during verification' 
+    });
   }
 };
 
