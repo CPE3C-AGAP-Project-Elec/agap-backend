@@ -1,47 +1,42 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
-const { generateVerificationCode, sendVerificationEmail } = require('../utils/emailService');
+const {
+  generateVerificationCode,
+  sendVerificationEmail,
+  sendResetPasswordEmail
+} = require('../utils/emailService');
 
-// Generate JWT Token
+// Generate JWT
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRE,
   });
 };
 
-// @desc    Register user
+
+
+// ================= REGISTER =================
 const registerUser = async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
-    console.log("Registration attempt for:", email);
-
     if (!name || !email || !password) {
-      return res.status(400).json({ 
-        success: false,
-        message: 'Please provide all required fields' 
-      });
+      return res.status(400).json({ success: false, message: 'Please provide all required fields' });
     }
 
     if (password.length < 6) {
-      return res.status(400).json({ 
-        success: false,
-        message: 'Password must be at least 6 characters' 
-      });
+      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
     }
 
     const userExists = await User.findOne({ email });
     if (userExists) {
-      return res.status(400).json({ 
-        success: false,
-        message: 'User already exists with this email' 
-      });
+      return res.status(400).json({ success: false, message: 'User already exists' });
     }
 
     const verificationCode = generateVerificationCode();
     const verificationCodeExpires = new Date(Date.now() + 10 * 60 * 1000);
 
-    const user = new User({
+    const user = await User.create({
       name,
       email,
       password,
@@ -50,65 +45,41 @@ const registerUser = async (req, res) => {
       verificationCodeExpires,
     });
 
-    await user.save();
-    console.log("User saved successfully");
-
-    const emailSent = await sendVerificationEmail(email, verificationCode);
-
-    if (!emailSent) {
-      console.log("Email failed to send, but user was created");
-    }
+    await sendVerificationEmail(email, verificationCode);
 
     res.status(201).json({
       success: true,
       message: 'Verification code sent to your email',
-      data: {
-        email: user.email,
-        requiresVerification: true,
-      },
+      data: { email: user.email, requiresVerification: true },
     });
+
   } catch (error) {
     console.error('Registration error:', error);
-    res.status(500).json({ 
-      success: false,
-      message: error.message || 'Server error during registration'
-    });
+    res.status(500).json({ success: false, message: 'Server error during registration' });
   }
 };
 
-// @desc    Verify email
+
+
+// ================= VERIFY EMAIL =================
 const verifyEmail = async (req, res) => {
   try {
     const { email, code } = req.body;
 
     if (!email || !code) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide email and verification code',
-      });
+      return res.status(400).json({ success: false, message: 'Please provide email and verification code' });
     }
 
     const user = await User.findOne({ email });
 
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found',
-      });
-    }
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
     if (user.verificationCode !== code) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid verification code',
-      });
+      return res.status(400).json({ success: false, message: 'Invalid verification code' });
     }
 
     if (user.verificationCodeExpires < new Date()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Verification code has expired',
-      });
+      return res.status(400).json({ success: false, message: 'Verification code has expired' });
     }
 
     user.isVerified = true;
@@ -116,45 +87,29 @@ const verifyEmail = async (req, res) => {
     user.verificationCodeExpires = undefined;
     await user.save();
 
-    res.status(200).json({
-      success: true,
-      message: 'Email verified successfully!',
-    });
+    res.status(200).json({ success: true, message: 'Email verified successfully!' });
+
   } catch (error) {
     console.error('Verification error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error during verification',
-    });
+    res.status(500).json({ success: false, message: 'Server error during verification' });
   }
 };
 
-// @desc    Resend verification code
+
+
+// ================= RESEND VERIFICATION =================
 const resendVerificationCode = async (req, res) => {
   try {
     const { email } = req.body;
 
-    if (!email) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide email',
-      });
-    }
+    if (!email) return res.status(400).json({ success: false, message: 'Please provide email' });
 
     const user = await User.findOne({ email });
 
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found',
-      });
-    }
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
     if (user.isVerified) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email already verified',
-      });
+      return res.status(400).json({ success: false, message: 'Email already verified' });
     }
 
     const verificationCode = generateVerificationCode();
@@ -166,42 +121,31 @@ const resendVerificationCode = async (req, res) => {
 
     await sendVerificationEmail(email, verificationCode);
 
-    res.status(200).json({
-      success: true,
-      message: 'New verification code sent',
-    });
+    res.status(200).json({ success: true, message: 'New verification code sent' });
+
   } catch (error) {
     console.error('Resend error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error',
-    });
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 };
 
-// @desc    Login user
+
+
+// ================= LOGIN =================
 const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ 
-        success: false,
-        message: 'Please provide email and password' 
-      });
+      return res.status(400).json({ success: false, message: 'Please provide email and password' });
     }
 
     const user = await User.findOne({ email }).select('+password');
-    
-    if (!user) {
-      return res.status(401).json({ 
-        success: false,
-        message: 'Invalid credentials' 
-      });
-    }
+
+    if (!user) return res.status(401).json({ success: false, message: 'Invalid credentials' });
 
     if (!user.isVerified) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
         message: 'Please verify your email first',
         requiresVerification: true,
@@ -210,13 +154,8 @@ const loginUser = async (req, res) => {
     }
 
     const isMatch = await user.matchPassword(password);
-    
-    if (!isMatch) {
-      return res.status(401).json({ 
-        success: false,
-        message: 'Invalid credentials' 
-      });
-    }
+
+    if (!isMatch) return res.status(401).json({ success: false, message: 'Invalid credentials' });
 
     res.status(200).json({
       success: true,
@@ -228,134 +167,47 @@ const loginUser = async (req, res) => {
         token: generateToken(user._id),
       }
     });
+
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ 
-      success: false,
-      message: 'Server error during login'
-    });
+    res.status(500).json({ success: false, message: 'Server error during login' });
   }
 };
 
-// @desc    Google OAuth login/signup (with email verification)
+
+
+// ================= GOOGLE AUTH =================
 const googleAuth = async (req, res) => {
   try {
     const { credential } = req.body;
 
-    console.log("Google auth request received");
-
     if (!credential) {
-      return res.status(400).json({
-        success: false,
-        message: 'No credential provided',
-      });
+      return res.status(400).json({ success: false, message: 'No credential provided' });
     }
 
-    // Helper function to generate verification code
-    const generateCode = () => {
-      return Math.floor(100000 + Math.random() * 900000).toString();
-    };
-
-    // Decode the Google token
-    let decoded;
-    try {
-      const base64Payload = credential.split('.')[1];
-      const payload = Buffer.from(base64Payload, 'base64').toString('utf8');
-      decoded = JSON.parse(payload);
-      console.log("Decoded Google user:", decoded.email);
-    } catch (decodeError) {
-      console.error("Token decode error:", decodeError);
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid Google token format',
-      });
-    }
+    const decoded = jwt.decode(credential);
 
     if (!decoded || !decoded.email) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid Google token - no email found',
-      });
+      return res.status(400).json({ success: false, message: 'Invalid Google token' });
     }
 
     const { email, name, picture, sub: googleId } = decoded;
 
-    // Check if user exists
     let user = await User.findOne({ email });
 
     if (!user) {
-      // Generate verification code for new user
-      const verificationCode = generateCode();
-      const verificationCodeExpires = new Date(Date.now() + 10 * 60 * 1000);
-
-      console.log("Creating new user with verification code:", verificationCode);
-
-      // Create new user (NOT verified yet)
-      user = new User({
+      user = await User.create({
         name: name || email.split('@')[0],
-        email: email,
-        password: Math.random().toString(36).slice(-16) + 'Aa1!',
-        isVerified: false,
-        verificationCode: verificationCode,
-        verificationCodeExpires: verificationCodeExpires,
-        googleId: googleId,
+        email,
+        password: Math.random().toString(36).slice(-16),
+        isVerified: true,
+        googleId,
         avatar: picture,
       });
-
-      await user.save();
-      console.log("User created successfully");
-      
-      // Send verification email
-      try {
-        const emailSent = await sendVerificationEmail(email, verificationCode);
-        if (emailSent) {
-          console.log("Verification email sent to:", email);
-        } else {
-          console.log("Failed to send verification email");
-        }
-      } catch (emailError) {
-        console.log("Email service error:", emailError.message);
-      }
-      
-      return res.status(201).json({
-        success: true,
-        message: 'Verification code sent to your email. Please verify your account.',
-        requiresVerification: true,
-        email: user.email,
-      });
-    } 
-    
-    // Existing user found
-    console.log("Existing user found, checking verification status");
-    
-    if (!user.isVerified) {
-      // User exists but not verified - send new verification code
-      const verificationCode = generateCode();
-      const verificationCodeExpires = new Date(Date.now() + 10 * 60 * 1000);
-      
-      user.verificationCode = verificationCode;
-      user.verificationCodeExpires = verificationCodeExpires;
-      await user.save();
-      
-      try {
-        await sendVerificationEmail(email, verificationCode);
-        console.log("New verification code sent to existing user:", email);
-      } catch (emailError) {
-        console.log("Email sending failed:", emailError.message);
-      }
-      
-      return res.status(401).json({
-        success: false,
-        message: 'Please verify your email first. A new verification code has been sent.',
-        requiresVerification: true,
-        email: user.email,
-      });
     }
-    
-    // User is verified - log them in
-    console.log("User verified, generating token");
+
     const token = generateToken(user._id);
-    
+
     res.status(200).json({
       success: true,
       message: 'Google login successful',
@@ -364,106 +216,269 @@ const googleAuth = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
-        avatar: picture,
-        token: token,
+        avatar: user.avatar,
+        token,
       },
     });
-    
+
   } catch (error) {
-    console.error('Google auth error details:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error during Google authentication: ' + error.message,
-    });
+    console.error('Google auth error:', error);
+    res.status(500).json({ success: false, message: 'Server error during Google authentication' });
   }
 };
 
-// @desc    Get current user
-const getMe = async (req, res) => {
+
+
+const forgotPassword = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
-    
-    if (!user) {
-      return res.status(404).json({
+    const { email } = req.body;
+
+    console.log("=========================================");
+    console.log("FORGOT PASSWORD REQUEST");
+    console.log("Email:", email);
+    console.log("=========================================");
+
+    if (!email) {
+      return res.status(400).json({
         success: false,
-        message: 'User not found'
+        message: 'Please provide an email address',
       });
     }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      console.log("❌ User not found:", email);
+      return res.status(200).json({
+        success: true,
+        message: 'If your email is registered, you will receive a password reset code.',
+      });
+    }
+
+    // Generate reset code (6 digits)
+    const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const resetCodeExpires = new Date(Date.now() + 10 * 60 * 1000);
+
+    console.log("🔐 Generated reset code:", resetCode);
+    console.log("⏰ Expires at:", resetCodeExpires);
+
+    // Save to user
+    user.resetCode = resetCode;
+    user.resetCodeExpires = resetCodeExpires;
+    await user.save();
+
+    console.log("✅ Reset code saved to database");
+    console.log("User ID:", user._id);
+    console.log("Saved resetCode:", user.resetCode);
+    console.log("Saved expires:", user.resetCodeExpires);
+
+    // Send email
+    const { sendResetPasswordEmail } = require('../utils/emailService');
+    await sendResetPasswordEmail(email, resetCode);
+
+    console.log("=========================================");
+    console.log("✅ Reset code sent successfully!");
+    console.log("=========================================");
 
     res.status(200).json({
       success: true,
-      data: user
+      message: 'If your email is registered, you will receive a password reset code.',
     });
   } catch (error) {
-    console.error('Get user error:', error);
-    res.status(500).json({ 
+    console.error('Forgot password error:', error);
+    res.status(500).json({
       success: false,
-      message: 'Server error'
+      message: 'Server error: ' + error.message,
     });
   }
 };
+// Password validation function
+const validatePassword = (password) => {
+  const requirements = {
+    minLength: password.length >= 8,
+    hasUpperCase: /[A-Z]/.test(password),
+    hasLowerCase: /[a-z]/.test(password),
+    hasNumber: /[0-9]/.test(password),
+    hasSpecialChar: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password),
+  };
 
-// @desc    Update user details
-const updateDetails = async (req, res) => {
+  const isValid = requirements.minLength && requirements.hasUpperCase &&
+    requirements.hasLowerCase && requirements.hasNumber &&
+    requirements.hasSpecialChar;
+
+  return { isValid, requirements };
+};
+
+// @desc    Reset password with code
+// @route   POST /api/auth/reset-password
+// @access  Public
+const resetPassword = async (req, res) => {
   try {
-    const { name, email } = req.body;
-    const user = await User.findById(req.user.id);
-    
-    if (name) user.name = name;
-    if (email) user.email = email;
-    await user.save();
-    
-    res.status(200).json({ 
-      success: true, 
-      data: user 
+    const { email, code, newPassword } = req.body;
+
+    console.log("=========================================");
+    console.log("RESET PASSWORD REQUEST");
+    console.log("Email:", email);
+    console.log("Code provided:", code);
+    console.log("=========================================");
+
+    if (!email || !code || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide email, reset code, and new password',
+      });
+    }
+
+    // Validate password strength
+    const { isValid, requirements } = validatePassword(newPassword);
+
+    if (!isValid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must contain at least 8 characters, 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character',
+        requirements: requirements,
+      });
+    }
+
+    // First check if user exists
+    const userExists = await User.findOne({ email });
+    if (!userExists) {
+      console.log("❌ User not found:", email);
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired reset code',
+      });
+    }
+
+    console.log("User found:", userExists.email);
+    console.log("Stored resetCode:", userExists.resetCode);
+    console.log("Stored expires:", userExists.resetCodeExpires);
+    console.log("Current time:", new Date());
+    console.log("Code provided:", code);
+
+    // Check if code matches and is not expired
+    if (!userExists.resetCode || userExists.resetCode !== code) {
+      console.log("❌ Code mismatch!");
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired reset code',
+      });
+    }
+
+    if (userExists.resetCodeExpires < new Date()) {
+      console.log("❌ Code expired!");
+      return res.status(400).json({
+        success: false,
+        message: 'Reset code has expired. Please request a new one.',
+      });
+    }
+
+    console.log("✅ Code is valid!");
+
+    // Update password
+    userExists.password = newPassword;
+    userExists.resetCode = undefined;
+    userExists.resetCodeExpires = undefined;
+    await userExists.save();
+
+    console.log("✅ Password reset successfully for:", email);
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset successfully! You can now login with your new password.',
     });
   } catch (error) {
-    console.error('Update error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error' 
+    console.error('Reset password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error: ' + error.message,
     });
   }
 };
 
-// @desc    Change password
+// @desc    Change password (when logged in)
+// @route   PUT /api/auth/changepassword
+// @access  Private
 const changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
-    const user = await User.findById(req.user.id).select('+password');
-    
-    const isMatch = await user.matchPassword(currentPassword);
-    if (!isMatch) {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'Current password is incorrect' 
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide current and new password',
       });
     }
-    
+
+    // Validate password strength
+    const { isValid, requirements } = validatePassword(newPassword);
+
+    if (!isValid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must contain at least 8 characters, 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character',
+        requirements: requirements,
+      });
+    }
+
+    const user = await User.findById(req.user.id).select('+password');
+
+    const isMatch = await user.matchPassword(currentPassword);
+    if (!isMatch) {
+      return res.status(401).json({
+        success: false,
+        message: 'Current password is incorrect',
+      });
+    }
+
     user.password = newPassword;
     await user.save();
-    
-    res.status(200).json({ 
-      success: true, 
-      message: 'Password updated successfully' 
+
+    res.status(200).json({
+      success: true,
+      message: 'Password updated successfully',
     });
   } catch (error) {
     console.error('Password change error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error' 
+    res.status(500).json({
+      success: false,
+      message: 'Server error: ' + error.message,
     });
   }
 };
 
-// ========== EXPORT ALL FUNCTIONS ==========
+// ================= USER =================
+const getMe = async (req, res) => {
+  const user = await User.findById(req.user.id);
+  res.status(200).json({ success: true, data: user });
+};
+
+const updateDetails = async (req, res) => {
+  const user = await User.findById(req.user.id);
+
+  user.name = req.body.name || user.name;
+  user.email = req.body.email || user.email;
+
+  await user.save();
+
+  res.status(200).json({ success: true, data: user });
+};
+
+
+
+
+// ================= EXPORT =================
 module.exports = {
   registerUser,
   verifyEmail,
   resendVerificationCode,
   loginUser,
   googleAuth,
+  forgotPassword,
+  validatePassword,
+  resetPassword,
+  changePassword,
   getMe,
   updateDetails,
-  changePassword,
+
 };
