@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "framework": "express",
+  "buildCommand": "npm install",
+  "startCommand": "node server.js",
+  "outputDirectory": ".",
+  "env": {
+    "NODE_ENV": "production"
+  }
+}
