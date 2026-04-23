@@ -11,6 +11,7 @@ dotenv.config();
 // Import routes
 const authRoutes = require('./routes/authRoutes');
 const weatherRoutes = require('./routes/weatherRoutes');
+const riskRoutes = require('./routes/riskRoutes');
 
 // Import database connection
 const connectDB = require('./config/database');
@@ -32,6 +33,7 @@ app.use(morgan('dev'));
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/weather', weatherRoutes);
+app.use('/api/risk', riskRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -58,6 +60,7 @@ app.get('/', (req, res) => {
 // Error handling middleware
 const errorMiddleware = require('./middleware/errorMiddleware');
 app.use(errorMiddleware);
+// Add this with other routes
 
 // Start server
 const PORT = process.env.PORT || 5000;
