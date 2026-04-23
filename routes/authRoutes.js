@@ -6,6 +6,8 @@ const {
   resendVerificationCode,
   loginUser,
   googleAuth,
+  forgotPassword,
+  resetPassword,
   getMe,
   updateDetails,
   changePassword,
@@ -17,9 +19,11 @@ router.post('/register', registerUser);
 router.post('/verify-email', verifyEmail);
 router.post('/resend-verification', resendVerificationCode);
 router.post('/login', loginUser);
-router.post('/google', googleAuth);  // Make sure googleAuth is defined
+router.post('/google', googleAuth);
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
 
-// Private routes
+// Private routes (require authentication)
 router.get('/me', protect, getMe);
 router.put('/updatedetails', protect, updateDetails);
 router.put('/changepassword', protect, changePassword);
