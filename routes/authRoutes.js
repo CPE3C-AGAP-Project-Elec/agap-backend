@@ -9,8 +9,8 @@ const {
   googleAuth,
   forgotPassword,
   resetPassword,
-  changePassword,      // Import this
-  deleteAccount,       // Import this
+  changePassword,
+  deleteAccount,  // ← ADD THIS IMPORT
   getMe,
   updateDetails,
 } = require('../controllers/authController');
@@ -28,7 +28,7 @@ router.post('/reset-password', resetPassword);
 // Protected routes (require authentication)
 router.get('/me', protect, getMe);
 router.put('/updatedetails', protect, updateDetails);
-router.put('/changepassword', protect, changePassword);      // Add this
-router.delete('/delete-account', protect, deleteAccount);    // Add this - NOTE: using DELETE method
+router.put('/changepassword', protect, changePassword);
+router.delete('/delete-account', protect, deleteAccount);  // ← ADD THIS ROUTE
 
 module.exports = router;
