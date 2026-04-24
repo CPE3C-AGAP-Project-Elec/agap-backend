@@ -99,9 +99,9 @@ const GoogleMapView = ({ latitude, longitude, locationName, floodRiskLevel }) =>
         return;
       }
 
-      // Create new script tag
+      // Create new script tag - FIXED: Added backticks
       const script = document.createElement('script');
-      script.src = https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&v=weekly;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&v=weekly`;
       script.async = true;
       script.defer = true;
       
@@ -341,7 +341,7 @@ const GoogleMapView = ({ latitude, longitude, locationName, floodRiskLevel }) =>
             React.createElement(
               'p',
               { style: { margin: '4px 0', fontSize: '11px', color: '#666' } },
-              📍 ${parseFloat(latitude).toFixed(4)}, ${parseFloat(longitude).toFixed(4)}
+              `📍 ${parseFloat(latitude).toFixed(4)}, ${parseFloat(longitude).toFixed(4)}`
             )
           )
         )
