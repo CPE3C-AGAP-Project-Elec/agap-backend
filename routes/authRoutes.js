@@ -1,6 +1,6 @@
+// agap-backend/routes/authRoutes.js
 const express = require('express');
 const router = express.Router();
-const { getRiskPrediction, getRiskHistory } = require('../controllers/riskController');
 const {
   registerUser,
   verifyEmail,
@@ -9,9 +9,10 @@ const {
   googleAuth,
   forgotPassword,
   resetPassword,
+  changePassword,
+  deleteAccount,  // ← ADD THIS IMPORT
   getMe,
   updateDetails,
-  changePassword,
 } = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -24,11 +25,10 @@ router.post('/google', googleAuth);
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);
 
-// Private routes (require authentication)
+// Protected routes (require authentication)
 router.get('/me', protect, getMe);
 router.put('/updatedetails', protect, updateDetails);
 router.put('/changepassword', protect, changePassword);
-router.get('/predict', getRiskPrediction);
-router.get('/history', getRiskHistory);
+router.delete('/delete-account', protect, deleteAccount);  // ← ADD THIS ROUTE
 
 module.exports = router;
