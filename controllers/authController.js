@@ -13,10 +13,7 @@ const generateToken = (id) => {
   });
 };
 
-
-
 // ================= REGISTER =================
-// In authController.js - update registerUser
 const registerUser = async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -26,7 +23,18 @@ const registerUser = async (req, res) => {
     console.log("Email:", email);
     console.log("========================================");
 
-    // ... validation ...
+    if (!name || !email || !password) {
+      return res.status(400).json({ success: false, message: 'Please provide all required fields' });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+    }
+
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+      return res.status(400).json({ success: false, message: 'User already exists' });
+    }
 
     const verificationCode = generateVerificationCode();
     const verificationCodeExpires = new Date(Date.now() + 10 * 60 * 1000);
@@ -40,7 +48,7 @@ const registerUser = async (req, res) => {
       email,
       password,
       isVerified: false,
-      verificationCode: verificationCode, // Store as string
+      verificationCode: verificationCode,
       verificationCodeExpires,
     });
 
@@ -59,108 +67,17 @@ const registerUser = async (req, res) => {
       data: { 
         email: user.email, 
         requiresVerification: true,
-        debug_code: process.env.NODE_ENV === 'development' ? verificationCode : undefined // Only for testing
+        debug_code: process.env.NODE_ENV === 'development' ? verificationCode : undefined
       },
     });
 
   } catch (error) {
     console.error('Registration error:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
+    res.status(500).json({ success: false, message: 'Server error during registration' });
   }
 };
-
-// agap-backend/controllers/authController.js
-// Add this function after your other functions
-
-// ================= DELETE ACCOUNT =================
-const deleteAccount = async (req, res) => {
-  try {
-    const userId = req.user.id; // From protect middleware
-    
-    console.log("========================================");
-    console.log("DELETE ACCOUNT REQUEST");
-    console.log("User ID:", userId);
-    console.log("========================================");
-    
-    // Find user before deleting (for logging)
-    const user = await User.findById(userId);
-    
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-    
-    console.log("Deleting user:", user.email);
-    
-    // Delete the user
-    await User.findByIdAndDelete(userId);
-    
-    console.log("✅ User deleted successfully");
-    
-    res.status(200).json({
-      success: true,
-      message: 'Account deleted successfully'
-    });
-    
-  } catch (error) {
-    console.error('Delete account error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while deleting account'
-    });
-  }
-};
-
-// Also add a function to change password (if not exists)
-const changePassword = async (req, res) => {
-  try {
-    const { currentPassword, newPassword } = req.body;
-    const userId = req.user.id;
-    
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide current and new password'
-      });
-    }
-    
-    const user = await User.findById(userId).select('+password');
-    
-    // Check current password
-    const isMatch = await user.matchPassword(currentPassword);
-    if (!isMatch) {
-      return res.status(401).json({
-        success: false,
-        message: 'Current password is incorrect'
-      });
-    }
-    
-    // Update password
-    user.password = newPassword;
-    await user.save();
-    
-    res.status(200).json({
-      success: true,
-      message: 'Password changed successfully'
-    });
-    
-  } catch (error) {
-    console.error('Change password error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while changing password'
-    });
-  }
-};
-
-
 
 // ================= VERIFY EMAIL =================
-// agap-backend/controllers/authController.js
-// Replace your verifyEmail function with this:
-
 const verifyEmail = async (req, res) => {
   try {
     const { email, code } = req.body;
@@ -196,7 +113,6 @@ const verifyEmail = async (req, res) => {
     console.log("Expires at:", user.verificationCodeExpires);
     console.log("Current time:", new Date());
 
-    // Check if user is already verified
     if (user.isVerified) {
       return res.status(400).json({ 
         success: false, 
@@ -204,7 +120,6 @@ const verifyEmail = async (req, res) => {
       });
     }
 
-    // Check if verification code exists
     if (!user.verificationCode) {
       return res.status(400).json({ 
         success: false, 
@@ -212,7 +127,7 @@ const verifyEmail = async (req, res) => {
       });
     }
 
-    // Convert both to string for comparison (fixes number/string mismatch)
+    // Convert both to string for comparison
     const storedCode = String(user.verificationCode);
     const providedCode = String(code);
 
@@ -226,7 +141,6 @@ const verifyEmail = async (req, res) => {
       });
     }
 
-    // Check if code is expired
     if (user.verificationCodeExpires < new Date()) {
       console.log("❌ Code expired!");
       return res.status(400).json({ 
@@ -237,7 +151,6 @@ const verifyEmail = async (req, res) => {
 
     console.log("✅ Code is valid! Verifying user...");
 
-    // Mark user as verified
     user.isVerified = true;
     user.verificationCode = undefined;
     user.verificationCodeExpires = undefined;
@@ -259,18 +172,20 @@ const verifyEmail = async (req, res) => {
   }
 };
 
-
-
 // ================= RESEND VERIFICATION =================
 const resendVerificationCode = async (req, res) => {
   try {
     const { email } = req.body;
 
-    if (!email) return res.status(400).json({ success: false, message: 'Please provide email' });
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Please provide email' });
+    }
 
     const user = await User.findOne({ email });
 
-    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
 
     if (user.isVerified) {
       return res.status(400).json({ success: false, message: 'Email already verified' });
@@ -293,8 +208,6 @@ const resendVerificationCode = async (req, res) => {
   }
 };
 
-
-
 // ================= LOGIN =================
 const loginUser = async (req, res) => {
   try {
@@ -306,7 +219,9 @@ const loginUser = async (req, res) => {
 
     const user = await User.findOne({ email }).select('+password');
 
-    if (!user) return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    }
 
     if (!user.isVerified) {
       return res.status(401).json({
@@ -319,7 +234,9 @@ const loginUser = async (req, res) => {
 
     const isMatch = await user.matchPassword(password);
 
-    if (!isMatch) return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    if (!isMatch) {
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    }
 
     res.status(200).json({
       success: true,
@@ -337,8 +254,6 @@ const loginUser = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error during login' });
   }
 };
-
-
 
 // ================= GOOGLE AUTH =================
 const googleAuth = async (req, res) => {
@@ -391,8 +306,7 @@ const googleAuth = async (req, res) => {
   }
 };
 
-
-
+// ================= FORGOT PASSWORD =================
 const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
@@ -419,14 +333,12 @@ const forgotPassword = async (req, res) => {
       });
     }
 
-    // Generate reset code (6 digits)
     const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
     const resetCodeExpires = new Date(Date.now() + 10 * 60 * 1000);
 
     console.log("🔐 Generated reset code:", resetCode);
     console.log("⏰ Expires at:", resetCodeExpires);
 
-    // Save to user
     user.resetCode = resetCode;
     user.resetCodeExpires = resetCodeExpires;
     await user.save();
@@ -436,8 +348,6 @@ const forgotPassword = async (req, res) => {
     console.log("Saved resetCode:", user.resetCode);
     console.log("Saved expires:", user.resetCodeExpires);
 
-    // Send email
-    const { sendResetPasswordEmail } = require('../utils/emailService');
     await sendResetPasswordEmail(email, resetCode);
 
     console.log("=========================================");
@@ -456,26 +366,8 @@ const forgotPassword = async (req, res) => {
     });
   }
 };
-// Password validation function
-const validatePassword = (password) => {
-  const requirements = {
-    minLength: password.length >= 8,
-    hasUpperCase: /[A-Z]/.test(password),
-    hasLowerCase: /[a-z]/.test(password),
-    hasNumber: /[0-9]/.test(password),
-    hasSpecialChar: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password),
-  };
 
-  const isValid = requirements.minLength && requirements.hasUpperCase &&
-    requirements.hasLowerCase && requirements.hasNumber &&
-    requirements.hasSpecialChar;
-
-  return { isValid, requirements };
-};
-
-// @desc    Reset password with code
-// @route   POST /api/auth/reset-password
-// @access  Public
+// ================= RESET PASSWORD =================
 const resetPassword = async (req, res) => {
   try {
     const { email, code, newPassword } = req.body;
@@ -493,7 +385,6 @@ const resetPassword = async (req, res) => {
       });
     }
 
-    // Validate password strength
     const { isValid, requirements } = validatePassword(newPassword);
 
     if (!isValid) {
@@ -504,7 +395,6 @@ const resetPassword = async (req, res) => {
       });
     }
 
-    // First check if user exists
     const userExists = await User.findOne({ email });
     if (!userExists) {
       console.log("❌ User not found:", email);
@@ -520,7 +410,6 @@ const resetPassword = async (req, res) => {
     console.log("Current time:", new Date());
     console.log("Code provided:", code);
 
-    // Check if code matches and is not expired
     if (!userExists.resetCode || userExists.resetCode !== code) {
       console.log("❌ Code mismatch!");
       return res.status(400).json({
@@ -539,7 +428,6 @@ const resetPassword = async (req, res) => {
 
     console.log("✅ Code is valid!");
 
-    // Update password
     userExists.password = newPassword;
     userExists.resetCode = undefined;
     userExists.resetCodeExpires = undefined;
@@ -560,21 +448,19 @@ const resetPassword = async (req, res) => {
   }
 };
 
-// @desc    Change password (when logged in)
-// @route   PUT /api/auth/changepassword
-// @access  Private
+// ================= CHANGE PASSWORD =================
 const changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
-
+    const userId = req.user.id;
+    
     if (!currentPassword || !newPassword) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide current and new password',
+        message: 'Please provide current and new password'
       });
     }
 
-    // Validate password strength
     const { isValid, requirements } = validatePassword(newPassword);
 
     if (!isValid) {
@@ -584,9 +470,9 @@ const changePassword = async (req, res) => {
         requirements: requirements,
       });
     }
-
-    const user = await User.findById(req.user.id).select('+password');
-
+    
+    const user = await User.findById(userId).select('+password');
+    
     const isMatch = await user.matchPassword(currentPassword);
     if (!isMatch) {
       return res.status(401).json({
@@ -594,44 +480,108 @@ const changePassword = async (req, res) => {
         message: 'Current password is incorrect',
       });
     }
-
+    
     user.password = newPassword;
     await user.save();
-
+    
     res.status(200).json({
       success: true,
-      message: 'Password updated successfully',
+      message: 'Password changed successfully'
     });
+    
   } catch (error) {
-    console.error('Password change error:', error);
+    console.error('Change password error:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error: ' + error.message,
+      message: 'Server error while changing password'
     });
   }
 };
 
-// ================= USER =================
+// ================= DELETE ACCOUNT =================
+const deleteAccount = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    console.log("========================================");
+    console.log("DELETE ACCOUNT REQUEST");
+    console.log("User ID:", userId);
+    console.log("========================================");
+    
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
+    console.log("Deleting user:", user.email);
+    
+    await User.findByIdAndDelete(userId);
+    
+    console.log("✅ User deleted successfully");
+    
+    res.status(200).json({
+      success: true,
+      message: 'Account deleted successfully'
+    });
+    
+  } catch (error) {
+    console.error('Delete account error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while deleting account'
+    });
+  }
+};
+
+// ================= PASSWORD VALIDATION =================
+const validatePassword = (password) => {
+  const requirements = {
+    minLength: password.length >= 8,
+    hasUpperCase: /[A-Z]/.test(password),
+    hasLowerCase: /[a-z]/.test(password),
+    hasNumber: /[0-9]/.test(password),
+    hasSpecialChar: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password),
+  };
+
+  const isValid = requirements.minLength && requirements.hasUpperCase &&
+    requirements.hasLowerCase && requirements.hasNumber &&
+    requirements.hasSpecialChar;
+
+  return { isValid, requirements };
+};
+
+// ================= USER PROFILE =================
 const getMe = async (req, res) => {
-  const user = await User.findById(req.user.id);
-  res.status(200).json({ success: true, data: user });
+  try {
+    const user = await User.findById(req.user.id);
+    res.status(200).json({ success: true, data: user });
+  } catch (error) {
+    console.error('Get user error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
 };
 
 const updateDetails = async (req, res) => {
-  const user = await User.findById(req.user.id);
+  try {
+    const user = await User.findById(req.user.id);
 
-  user.name = req.body.name || user.name;
-  user.email = req.body.email || user.email;
+    user.name = req.body.name || user.name;
+    user.email = req.body.email || user.email;
 
-  await user.save();
+    await user.save();
 
-  res.status(200).json({ success: true, data: user });
+    res.status(200).json({ success: true, data: user });
+  } catch (error) {
+    console.error('Update details error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
 };
 
-
-
-
-// Update your module.exports to include these new functions
+// ================= EXPORT =================
 module.exports = {
   registerUser,
   verifyEmail,
@@ -640,9 +590,8 @@ module.exports = {
   googleAuth,
   forgotPassword,
   resetPassword,
-  changePassword,      // Add this
-  deleteAccount,       // Add this
+  changePassword,
+  deleteAccount,
   getMe,
   updateDetails,
-  // ... other exports
 };
