@@ -69,6 +69,92 @@ const registerUser = async (req, res) => {
   }
 };
 
+// agap-backend/controllers/authController.js
+// Add this function after your other functions
+
+// ================= DELETE ACCOUNT =================
+const deleteAccount = async (req, res) => {
+  try {
+    const userId = req.user.id; // From protect middleware
+    
+    console.log("========================================");
+    console.log("DELETE ACCOUNT REQUEST");
+    console.log("User ID:", userId);
+    console.log("========================================");
+    
+    // Find user before deleting (for logging)
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
+    console.log("Deleting user:", user.email);
+    
+    // Delete the user
+    await User.findByIdAndDelete(userId);
+    
+    console.log("✅ User deleted successfully");
+    
+    res.status(200).json({
+      success: true,
+      message: 'Account deleted successfully'
+    });
+    
+  } catch (error) {
+    console.error('Delete account error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while deleting account'
+    });
+  }
+};
+
+// Also add a function to change password (if not exists)
+const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const userId = req.user.id;
+    
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide current and new password'
+      });
+    }
+    
+    const user = await User.findById(userId).select('+password');
+    
+    // Check current password
+    const isMatch = await user.matchPassword(currentPassword);
+    if (!isMatch) {
+      return res.status(401).json({
+        success: false,
+        message: 'Current password is incorrect'
+      });
+    }
+    
+    // Update password
+    user.password = newPassword;
+    await user.save();
+    
+    res.status(200).json({
+      success: true,
+      message: 'Password changed successfully'
+    });
+    
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while changing password'
+    });
+  }
+};
+
 
 
 // ================= VERIFY EMAIL =================
@@ -545,7 +631,7 @@ const updateDetails = async (req, res) => {
 
 
 
-// ================= EXPORT =================
+// Update your module.exports to include these new functions
 module.exports = {
   registerUser,
   verifyEmail,
@@ -553,10 +639,10 @@ module.exports = {
   loginUser,
   googleAuth,
   forgotPassword,
-  validatePassword,
   resetPassword,
-  changePassword,
+  changePassword,      // Add this
+  deleteAccount,       // Add this
   getMe,
   updateDetails,
-
+  // ... other exports
 };
